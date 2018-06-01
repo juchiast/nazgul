@@ -7,6 +7,18 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 
 import sys
+import hashlib
+from PIL import Image
+
+hashmap = {}
+
+def to_tensor(image):
+    x = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+    ])(image)
+    hashmap[hashlib.md5(x.numpy()).hexdigest()] = image
+    return x
 
 class Net(nn.Module):
     def __init__(self):
@@ -40,22 +52,32 @@ def train(args, model, device, train_loader, optimizer, epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
 
-def test(args, model, device, test_loader):
+def test(args, model, device, test_loader, failed):
     model.eval()
     test_loss = 0
     correct = 0
     with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
+        for _data, target in test_loader:
+            data, target = _data.to(device), target.to(device)
             output = model(data)
             test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
             pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
+            for i, p in enumerate(pred.eq(target.view_as(pred))):
+                if p.item() == 0:
+                    name = str(target[i].item()) + '_' + str(pred[i].item())
+                    h = hashlib.md5(_data[i].numpy()).hexdigest()
+                    if name in failed:
+                        failed[name].append(h)
+                    else:
+                        failed[name] = [h]
+                else:
+                    correct += 1
 
     test_loss /= len(test_loader.dataset)
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
+
 
 class Args:
     def __init__(self):
@@ -80,8 +102,7 @@ def main():
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
     transformer = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
+        transforms.Lambda(to_tensor),
     ])
 
     model = Net().to(device)
@@ -93,7 +114,13 @@ def main():
 
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
         model.load_state_dict(torch.load(args.save_path))
-        test(args, model, device, test_loader)
+        failed = {}
+        test(args, model, device, test_loader, failed)
+        for k, v in failed.items():
+            im = Image.new(mode='L', size=(len(v) * 28, 28))
+            for i, f in enumerate(map(lambda h: hashmap[h], v)):
+                im.paste(f, (i * 28, 0))
+            im.save('./result/' + k + '.png')
     else:
         train_loader = torch.utils.data.DataLoader(
             datasets.MNIST(args.data_path, train=True, transform=transformer),
