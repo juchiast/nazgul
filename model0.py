@@ -52,7 +52,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
 
-def test(args, model, device, test_loader, failed):
+def test(args, model, device, test_loader, failed=None):
     model.eval()
     test_loss = 0
     correct = 0
@@ -64,12 +64,13 @@ def test(args, model, device, test_loader, failed):
             pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
             for i, p in enumerate(pred.eq(target.view_as(pred))):
                 if p.item() == 0:
-                    name = str(target[i].item()) + '_' + str(pred[i].item())
-                    h = hashlib.md5(_data[i].numpy()).hexdigest()
-                    if name in failed:
-                        failed[name].append(h)
-                    else:
-                        failed[name] = [h]
+                    if failed is not None:
+                        name = str(target[i].item()) + '_' + str(pred[i].item())
+                        h = hashlib.md5(_data[i].numpy()).hexdigest()
+                        if name in failed:
+                            failed[name].append(h)
+                        else:
+                            failed[name] = [h]
                 else:
                     correct += 1
 
