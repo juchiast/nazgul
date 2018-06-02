@@ -50,7 +50,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
+                100. * batch_idx / len(train_loader), loss.item()), end='\r')
 
 def test(args, model, device, test_loader, failed=None):
     model.eval()
@@ -84,9 +84,9 @@ class Args:
     def __init__(self):
         self.no_cuda = False
         self.seed = 1
-        self.batch_size = 64
+        self.batch_size = 1
         self.test_batch_size = 1000
-        self.epochs = 20
+        self.epochs = 10
         self.lr = 0.01
         self.log_interval = 10
         self.momentum = 0.5
@@ -100,7 +100,7 @@ def main():
 
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+    kwargs = {'num_workers': 32, 'pin_memory': True} if use_cuda else {}
 
     transformer = transforms.Compose([
         transforms.Lambda(to_tensor),
@@ -113,6 +113,7 @@ def main():
         datasets.MNIST(args.data_path, train=False, transform=transformer),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
+    print(sys.argv)
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
         model.load_state_dict(torch.load(args.save_path))
         failed = {}
