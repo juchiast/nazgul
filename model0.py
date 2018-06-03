@@ -56,6 +56,7 @@ def test(args, model, device, test_loader, failed=None):
     model.eval()
     test_loss = 0
     correct = 0
+    confusion = [[0] * 10 for i in range(10)]
     with torch.no_grad():
         for _data, target in test_loader:
             data, target = _data.to(device), target.to(device)
@@ -63,6 +64,7 @@ def test(args, model, device, test_loader, failed=None):
             test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
             pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
             for i, p in enumerate(pred.eq(target.view_as(pred))):
+                confusion[pred[i].item()][target[i].item()] += 1
                 if p.item() == 0:
                     if failed is not None:
                         name = str(target[i].item()) + '_' + str(pred[i].item())
@@ -78,15 +80,18 @@ def test(args, model, device, test_loader, failed=None):
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
+    print('Confusion matrix:')
+    for x in confusion:
+        print(*x, sep = '\t')
 
 
 class Args:
     def __init__(self):
         self.no_cuda = False
         self.seed = 1
-        self.batch_size = 1
+        self.batch_size = 64
         self.test_batch_size = 1000
-        self.epochs = 10
+        self.epochs = 20
         self.lr = 0.01
         self.log_interval = 10
         self.momentum = 0.5
