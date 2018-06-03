@@ -120,7 +120,7 @@ def main():
 
     print(sys.argv)
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
-        model.load_state_dict(torch.load(args.save_path))
+        model.load_state_dict(torch.load(args.save_path, map_location=lambda storage, loc: storage))
         failed = {}
         test(args, model, device, test_loader, failed)
         for k, v in failed.items():
