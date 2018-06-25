@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
+import matplotlib.pyplot as plt
+from conv_moreconv_relu import Net # change conv_moreconv_relu to something else
 
 import sys
 import hashlib
@@ -20,24 +22,7 @@ def to_tensor(image):
     hashmap[hashlib.md5(x.numpy()).hexdigest()] = image
     return x
 
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
-        self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
-        self.conv2_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(320, 50)
-        self.fc2 = nn.Linear(50, 10)
-
-    def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, 320)
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
-
+losses = []
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -48,7 +33,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss.backward()
         optimizer.step()
         if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            print('Train Epoch: {} [{:6d}/{:6d} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()), end='\r')
 
@@ -77,12 +62,13 @@ def test(args, model, device, test_loader, failed=None):
                     correct += 1
 
     test_loss /= len(test_loader.dataset)
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
     print('Confusion matrix:')
     for x in confusion:
         print(*x, sep = '\t')
+    losses.append(test_loss)
 
 
 class Args:
@@ -90,13 +76,13 @@ class Args:
         self.no_cuda = False
         self.seed = 1
         self.batch_size = 64
-        self.test_batch_size = 1000
+        self.test_batch_size = 64
         self.epochs = 20
         self.lr = 0.01
         self.log_interval = 10
         self.momentum = 0.5
         self.save_path = './saved/model0'
-        self.data_path = './data_mnist'
+        self.data_path = './data'
 
 def main():
     args = Args()
@@ -105,7 +91,7 @@ def main():
 
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    kwargs = {'num_workers': 32, 'pin_memory': True} if use_cuda else {}
+    kwargs = {'num_workers': 16, 'pin_memory': True} if use_cuda else {}
 
     transformer = transforms.Compose([
         transforms.Lambda(to_tensor),
@@ -115,22 +101,22 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST(args.data_path, train=False, transform=transformer),
+        datasets.EMNIST(args.data_path, split='mnist', train=False, transform=transformer),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
-    print(sys.argv)
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
         model.load_state_dict(torch.load(args.save_path, map_location=lambda storage, loc: storage))
         failed = {}
         test(args, model, device, test_loader, failed)
         for k, v in failed.items():
             im = Image.new(mode='L', size=(len(v) * 28, 28))
-            for i, f in enumerate(map(lambda h: hashmap[h], v)):
-                im.paste(f, (i * 28, 0))
+            for i, f in enumerate(map(lambda h: hashmap.get(h, None), v)):
+                if f != None:
+                    im.paste(f, (i * 28, 0))
             im.save('./result/' + k + '.png')
     else:
         train_loader = torch.utils.data.DataLoader(
-            datasets.MNIST(args.data_path, train=True, transform=transformer),
+            datasets.EMNIST(args.data_path, split='mnist', train=True, transform=transformer),
             batch_size=args.batch_size, shuffle=True, **kwargs)
 
         for epoch in range(args.epochs):
@@ -138,6 +124,10 @@ def main():
             test(args, model, device, test_loader)
 
         torch.save(model.state_dict(), args.save_path)
+        plt.plot(list(range(len(losses))), losses)
+        plt.xlabel('epoch')
+        plt.ylabel('loss')
+        plt.show()
 
 
 if __name__ == '__main__':
