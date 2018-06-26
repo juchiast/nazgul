@@ -111,6 +111,7 @@ class Args:
         self.save_path = './saved/model0'
         self.data_path = './data_mnist'
 
+accuracieses = []
 def foo(Model, Name):
     print(Name)
     args = Args()
@@ -153,6 +154,7 @@ def foo(Model, Name):
             test(args, model, device, test_loader, accuracies)
 
         torch.save(model.state_dict(), args.save_path)
+        accuracieses.append((accuracies, Name))
         plt.plot(accuracies)
         plt.xlabel('epoch')
         plt.ylabel('accuracy')
@@ -163,5 +165,13 @@ def foo(Model, Name):
 
 
 if __name__ == '__main__':
-    for Model, Name in conv_models[4:5]:
+    for Model, Name in linear_models:
         foo(Model, Name)
+    accuracieseses = [x[0] for x in accuracieses]
+    names = [x[1] for x in accuracieses]
+    for x in accuracieseses:
+        plt.plot(x)
+    plt.xlabel('epoch')
+    plt.ylabel('accuracy')
+    plt.legend(names)
+    plt.savefig('summary')
