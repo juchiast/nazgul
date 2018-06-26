@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+
+for filename in *.png; do
+    convert "$filename" -trim +repage "$filename"
+done
