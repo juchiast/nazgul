@@ -1,5 +1,8 @@
 from __future__ import print_function
 import argparse
+import pandas as pd
+import seaborn as sn
+sn.set()
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,33 +10,8 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 # from conv_simple import Net # change conv_moreconv_relu to something else
-import linear_simple
-import linear_sigmoid
-import linear_relu
-import linear_leakyrelu
-import linear_elu
-import linear_swish
-import conv_simple
-import conv_moreconv
-import conv_moreconv_sigmoid
-import conv_moreconv_relu
-import conv_moreconv_elu
-import conv_moreconv_leakyrelu
-import conv_moreconv_swish
-
-linear_models = [(linear_simple.Net, 'simple softmax regression'),
-                 (linear_sigmoid.Net, 'softmax regression with sigmoid activation'),
-                 (linear_relu.Net, 'softmax regression with relu activation'),
-                 (linear_leakyrelu.Net, 'softmax regression with leaky relu activation'),
-                 (linear_elu.Net, 'softmax regression with elu activation'),
-                 (linear_swish.Net, 'softmax regression with swish activation')]
-conv_models = [(conv_simple.Net, 'simple convolutional neural network'),
-               (conv_moreconv_sigmoid.Net, 'convolutional neural network with sigmoid activation'),
-               (conv_moreconv.Net, 'cnn with more convolutional layer'),
-               (conv_moreconv_relu.Net, 'convolutional neural network with relu activation'),
-               (conv_moreconv_leakyrelu.Net, 'convolutional neural network with leaky relu activation'),
-               (conv_moreconv_elu.Net, 'convolutional neural network with elu activation'),
-               (conv_moreconv_swish.Net, 'convolutional neural network with swish activation')]
+import linear_models
+import conv_models
 
 import sys
 import hashlib
@@ -92,9 +70,12 @@ def test(args, model, device, test_loader, accuracies, failed=None):
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
-    print('Confusion matrix:')
-    for x in confusion:
-        print(*x, sep = '\t')
+#     for x in confusion:
+#         print(*x, sep = '\t')
+#     cm = pd.DataFrame(confusion, index = list(range(10)), columns = list(range(10)))
+#     f, ax = plt.subplots(figsize = (10, 7))
+#     sn.heatmap(cm, annot = True, ax = ax)
+#     plt.show()
     accuracies.append(correct / len(test_loader.dataset))
 
 
@@ -108,7 +89,7 @@ class Args:
         self.lr = 0.01
         self.log_interval = 10
         self.momentum = 0.5
-        self.save_path = './saved/model0'
+        self.save_path = './saved/'
         self.data_path = './data_mnist'
 
 accuracieses = []
@@ -134,7 +115,7 @@ def foo(Model, Name):
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
-        model.load_state_dict(torch.load(args.save_path, map_location=lambda storage, loc: storage))
+        model.load_state_dict(torch.load(args.save_path + Name, map_location=lambda storage, loc: storage))
         failed = {}
         test(args, model, device, test_loader, failed)
         for k, v in failed.items():
@@ -153,7 +134,7 @@ def foo(Model, Name):
             train(args, model, device, train_loader, optimizer, epoch)
             test(args, model, device, test_loader, accuracies)
 
-        torch.save(model.state_dict(), args.save_path)
+        torch.save(model.state_dict(), args.save_path + Name)
         accuracieses.append((accuracies, Name))
         plt.plot(accuracies)
         plt.xlabel('epoch')
@@ -165,7 +146,7 @@ def foo(Model, Name):
 
 
 if __name__ == '__main__':
-    for Model, Name in linear_models:
+    for Model, Name in linear_models.linear_models:
         foo(Model, Name)
     accuracieseses = [x[0] for x in accuracieses]
     names = [x[1] for x in accuracieses]
@@ -174,4 +155,4 @@ if __name__ == '__main__':
     plt.xlabel('epoch')
     plt.ylabel('accuracy')
     plt.legend(names)
-    plt.savefig('summary')
+    plt.savefig('summary linear')
