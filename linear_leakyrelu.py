@@ -1,9 +1,9 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-class LRNet(nn.Module):
+class Net(nn.Module):
     def __init__(self):
-        super(LRNet, self).__init__()
+        super(Net, self).__init__()
         self.fc = nn.Linear(784, 10)
 
     def forward(self, x):

@@ -6,7 +6,34 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
-from conv_moreconv_relu import Net # change conv_moreconv_relu to something else
+# from conv_simple import Net # change conv_moreconv_relu to something else
+import linear_simple
+import linear_sigmoid
+import linear_relu
+import linear_leakyrelu
+import linear_elu
+import linear_swish
+import conv_simple
+import conv_moreconv
+import conv_moreconv_sigmoid
+import conv_moreconv_relu
+import conv_moreconv_elu
+import conv_moreconv_leakyrelu
+import conv_moreconv_swish
+
+linear_models = [(linear_simple.Net, 'simple softmax regression'),
+                 (linear_sigmoid.Net, 'softmax regression with sigmoid activation'),
+                 (linear_relu.Net, 'softmax regression with relu activation'),
+                 (linear_leakyrelu.Net, 'softmax regression with leaky relu activation'),
+                 (linear_elu.Net, 'softmax regression with elu activation'),
+                 (linear_swish.Net, 'softmax regression with swish activation')]
+conv_models = [(conv_simple.Net, 'simple convolutional neural network'),
+               (conv_moreconv_sigmoid.Net, 'convolutional neural network with sigmoid activation'),
+               (conv_moreconv.Net, 'cnn with more convolutional layer'),
+               (conv_moreconv_relu.Net, 'convolutional neural network with relu activation'),
+               (conv_moreconv_leakyrelu.Net, 'convolutional neural network with leaky relu activation'),
+               (conv_moreconv_elu.Net, 'convolutional neural network with elu activation'),
+               (conv_moreconv_swish.Net, 'convolutional neural network with swish activation')]
 
 import sys
 import hashlib
@@ -22,7 +49,7 @@ def to_tensor(image):
     hashmap[hashlib.md5(x.numpy()).hexdigest()] = image
     return x
 
-losses = []
+accuracy = []
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -37,7 +64,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()), end='\r')
 
-def test(args, model, device, test_loader, failed=None):
+def test(args, model, device, test_loader, accuracies, failed=None):
     model.eval()
     test_loss = 0
     correct = 0
@@ -68,7 +95,7 @@ def test(args, model, device, test_loader, failed=None):
     print('Confusion matrix:')
     for x in confusion:
         print(*x, sep = '\t')
-    losses.append(test_loss)
+    accuracies.append(correct / len(test_loader.dataset))
 
 
 class Args:
@@ -82,9 +109,10 @@ class Args:
         self.log_interval = 10
         self.momentum = 0.5
         self.save_path = './saved/model0'
-        self.data_path = './data'
+        self.data_path = './data_mnist'
 
-def main():
+def foo(Model, Name):
+    print(Name)
     args = Args()
 
     torch.manual_seed(args.seed)
@@ -97,11 +125,11 @@ def main():
         transforms.Lambda(to_tensor),
     ])
 
-    model = Net().to(device)
+    model = Model().to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
     test_loader = torch.utils.data.DataLoader(
-        datasets.EMNIST(args.data_path, split='mnist', train=False, transform=transformer),
+        datasets.EMNIST(args.data_path, split='mnist', train=False, transform=transformer, download = True),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
@@ -116,19 +144,24 @@ def main():
             im.save('./result/' + k + '.png')
     else:
         train_loader = torch.utils.data.DataLoader(
-            datasets.EMNIST(args.data_path, split='mnist', train=True, transform=transformer),
+            datasets.EMNIST(args.data_path, split='mnist', train=True, transform=transformer, download=True),
             batch_size=args.batch_size, shuffle=True, **kwargs)
 
+        accuracies = []
         for epoch in range(args.epochs):
             train(args, model, device, train_loader, optimizer, epoch)
-            test(args, model, device, test_loader)
+            test(args, model, device, test_loader, accuracies)
 
         torch.save(model.state_dict(), args.save_path)
-        plt.plot(list(range(len(losses))), losses)
+        plt.plot(accuracies)
         plt.xlabel('epoch')
-        plt.ylabel('loss')
-        plt.show()
+        plt.ylabel('accuracy')
+#         plt.show()
+        plt.title(Name)
+        plt.savefig(Name)
+        plt.clf()
 
 
 if __name__ == '__main__':
-    main()
+    for Model, Name in conv_models[4:5]:
+        foo(Model, Name)
